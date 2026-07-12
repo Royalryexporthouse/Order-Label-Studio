@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order Label Studio</title>
+
+<!-- Libraries (need internet the first time you open this file) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#f4efe6; --ink:#1c1a17; --muted:#6f6557;
+    --accent:#c4502a; --accent-deep:#9c3d1f;
+    --line:#d9d0c0; --card:#fbf8f2; --ok:#3f6f3a; --warn:#b07a16;
+    --shadow:0 1px 0 #fff inset, 0 18px 40px -24px rgba(40,30,20,.4);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:
+      radial-gradient(120% 120% at 80% -10%, #efe7d8 0%, transparent 55%),
+      var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:48px 24px 80px}
+  header{margin-bottom:8px}
+  .kicker{font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--accent-deep)}
+  h1{font-family:"Fraunces",Georgia,serif; font-weight:600; font-size:clamp(34px,5vw,52px);
+    margin:.1em 0 .15em; letter-spacing:-.01em}
+  .sub{color:var(--muted); max-width:60ch; margin:0 0 28px}
+  .sub b{color:var(--ink); font-weight:600}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:22px; box-shadow:var(--shadow); margin-bottom:20px}
+  .card h2{font-family:"Fraunces",serif; font-weight:500; font-size:20px; margin:0 0 4px}
+  .card .hint{color:var(--muted); font-size:14px; margin:0 0 16px}
+  .step{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .num{font-family:"IBM Plex Mono",monospace; font-size:12px; width:26px; height:26px;
+    display:grid; place-items:center; border:1px solid var(--accent); color:var(--accent-deep);
+    border-radius:50%; flex:none}
+
+  .drop{border:2px dashed var(--line); border-radius:12px; padding:34px 20px; text-align:center;
+    cursor:pointer; transition:.18s; background:rgba(255,255,255,.4)}
+  .drop:hover,.drop.hot{border-color:var(--accent); background:rgba(196,80,42,.06)}
+  .drop strong{color:var(--accent-deep)}
+  .drop .file{font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--ink); margin-top:8px}
+
+  .opts{display:flex; flex-wrap:wrap; gap:24px; align-items:flex-end}
+  .opt label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px;
+    font-family:"IBM Plex Mono",monospace; letter-spacing:.04em; text-transform:uppercase}
+  select{font:inherit; padding:9px 12px; border:1px solid var(--line); border-radius:9px;
+    background:#fff; color:var(--ink); min-width:160px}
+  .relay{display:flex; gap:9px; align-items:flex-start; margin-top:18px; font-size:13.5px; color:var(--muted); cursor:pointer}
+  .relay input{margin-top:3px; accent-color:var(--accent); flex:none}
+  .relay span{display:block}
+
+  .custom{display:grid; grid-template-columns:1fr 1fr auto; gap:26px; margin-top:24px;
+    padding-top:22px; border-top:1px solid var(--line)}
+  .custom-col h3{font-family:"Fraunces",serif; font-weight:500; font-size:15px; margin:0 0 12px;
+    color:var(--accent-deep); letter-spacing:.01em}
+  .custom .opt{margin-bottom:13px}
+  .custom .opt label{display:flex; justify-content:space-between; align-items:center}
+  .custom .opt output{font-family:"IBM Plex Mono",monospace; color:var(--ink);
+    text-transform:none; letter-spacing:0; font-size:12px}
+  .custom select{min-width:0; width:100%}
+  input[type=color]{width:100%; height:38px; border:1px solid var(--line); border-radius:9px;
+    background:#fff; padding:3px; cursor:pointer}
+  input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
+  .micro{display:block; color:var(--muted); font-size:11px; margin-top:3px; font-family:"IBM Plex Mono",monospace}
+  .preview-col{justify-self:end}
+  #preview{border:1px solid var(--line); border-radius:10px; background:#f0ebe0; width:200px; height:200px}
+
+  /* ---------- responsive / mobile ---------- */
+  @media(max-width:760px){
+    .wrap{padding:28px 16px 64px}
+    .card{padding:18px; border-radius:12px}
+    .opts{flex-direction:column; align-items:stretch; gap:16px}
+    .opt{width:100%}
+    select{width:100%; min-width:0}
+    button.go{width:100%; padding:16px; font-size:17px}
+    .drop{padding:30px 16px}
+    .custom{grid-template-columns:1fr; gap:22px}
+    /* show the live preview first on mobile so edits are visible immediately */
+    .preview-col{justify-self:stretch; order:-1; text-align:center}
+    #preview{width:min(70vw,220px); height:auto}
+    .dl{flex-direction:column}
+    button.dl-btn{width:100%; padding:15px}
+    .grid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:9px}
+    .cell img{height:88px}
+    .relay{font-size:13px}
+  }
+  @media(max-width:400px){
+    h1{font-size:30px}
+    .grid{grid-template-columns:repeat(2,1fr)}
+  }
+  /* larger tap targets on touch devices */
+  @media(hover:none){
+    select,input[type=color]{min-height:44px}
+    input[type=range]{height:30px}
+  }
+
+  button.go{font-family:"IBM Plex Sans",sans-serif; font-weight:600; font-size:16px;
+    color:#fff; background:var(--accent); border:none; padding:14px 26px; border-radius:10px;
+    cursor:pointer; transition:.15s; box-shadow:0 10px 22px -12px var(--accent)}
+  button.go:hover:not(:disabled){background:var(--accent-deep)}
+  button.go:disabled{opacity:.45; cursor:not-allowed; box-shadow:none}
+  .dl{display:flex; gap:12px; flex-wrap:wrap; margin-top:6px}
+  button.dl-btn{font:inherit; font-weight:600; border:1px solid var(--accent); color:var(--accent-deep);
+    background:#fff; padding:11px 20px; border-radius:9px; cursor:pointer}
+  button.dl-btn:hover{background:rgba(196,80,42,.07)}
+
+  .bar{height:10px; background:#e7ddcc; border-radius:99px; overflow:hidden; margin:14px 0 8px}
+  .bar i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent-deep));
+    transition:width .2s}
+  .statline{font-size:14px; color:var(--muted)}
+  .statline b{color:var(--ink)}
+  .pill{font-family:"IBM Plex Mono",monospace; font-size:12px; padding:2px 8px; border-radius:99px}
+  .pill.ok{background:rgba(63,111,58,.12); color:var(--ok)}
+  .pill.ph{background:rgba(176,122,22,.14); color:var(--warn)}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:12px; margin-top:18px}
+  .cell{background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; font-size:11px}
+  .cell img{width:100%; height:108px; object-fit:cover; display:block; background:#eee}
+  .cell .cap{padding:5px 7px; font-family:"IBM Plex Mono",monospace; color:var(--muted)}
+  .cell .cap b{color:var(--ink); font-weight:500}
+
+  .note{font-size:13.5px; background:rgba(196,80,42,.07); border:1px solid rgba(196,80,42,.25);
+    border-radius:10px; padding:14px 16px; color:#5a4a3c}
+  .note b{color:var(--accent-deep)}
+  .hidden{display:none}
+  footer{color:var(--muted); font-size:13px; text-align:center; margin-top:34px;
+    font-family:"IBM Plex Mono",monospace}
+  code{font-family:"IBM Plex Mono",monospace; background:#efe7d8; padding:1px 5px; border-radius:4px}
+
+  /* ---------- custom date picker ---------- */
+  .olsdp-wrap{display:flex; flex-direction:column; gap:6px}
+  .olsdp-lbl{font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted)}
+  .olsdp, .olspo{position:relative; font-family:"IBM Plex Sans",system-ui,sans-serif;
+    --dp-muted:#6f6557; --dp-line:#d9d0c0; --dp-accent:#c4502a; --dp-accent-deep:#9c3d1f;
+    --dp-accent-soft:rgba(196,80,42,.10); --dp-card:#ffffff; --dp-ink:#1c1a17; --dp-today:#9c3d1f;
+    --dp-shadow:0 18px 40px -24px rgba(40,30,20,.45), 0 2px 6px -3px rgba(40,30,20,.22)}
+  .olsdp{display:inline-block}
+  .olspo{display:block; width:100%}
+  @media (prefers-color-scheme: dark){
+    .olsdp, .olspo{--dp-muted:#a99c86; --dp-line:#3a332a; --dp-accent:#e07a52; --dp-accent-deep:#f0a483;
+      --dp-accent-soft:rgba(224,122,82,.16); --dp-card:#2a251e; --dp-ink:#f1e9db; --dp-today:#f0a483;
+      --dp-shadow:0 20px 45px -22px rgba(0,0,0,.7), 0 2px 8px -3px rgba(0,0,0,.5)}
+  }
+  .olsdp[data-theme="dark"], .olspo[data-theme="dark"]{--dp-muted:#a99c86; --dp-line:#3a332a; --dp-accent:#e07a52; --dp-accent-deep:#f0a483;
+    --dp-accent-soft:rgba(224,122,82,.16); --dp-card:#2a251e; --dp-ink:#f1e9db; --dp-today:#f0a483;
+    --dp-shadow:0 20px 45px -22px rgba(0,0,0,.7), 0 2px 8px -3px rgba(0,0,0,.5)}
+  .olsdp-field{display:inline-flex; align-items:center; gap:10px; min-width:220px; font:inherit; font-size:15px;
+    color:var(--dp-ink); background:var(--dp-card); border:1px solid var(--dp-line); border-radius:11px;
+    padding:11px 14px; cursor:pointer; transition:border-color .18s, box-shadow .18s}
+  .olsdp-field:hover{border-color:var(--dp-accent)}
+  .olsdp-field:focus-visible{outline:none; border-color:var(--dp-accent); box-shadow:0 0 0 3px var(--dp-accent-soft)}
+  .olsdp-field .cal{color:var(--dp-accent); display:flex}
+  .olsdp-field .val{flex:1; text-align:left; font-variant-numeric:tabular-nums}
+  .olsdp-field .chev{color:var(--dp-muted); display:flex; transition:transform .2s}
+  .olsdp[data-open="true"] .chev{transform:rotate(180deg)}
+  .olsdp-pop{position:absolute; z-index:50; top:calc(100% + 8px); left:0; width:min(310px,92vw);
+    background:var(--dp-card); border:1px solid var(--dp-line); border-radius:16px; box-shadow:var(--dp-shadow);
+    padding:14px; transform-origin:top left; opacity:0; transform:translateY(-6px) scale(.98);
+    pointer-events:none; transition:opacity .16s ease, transform .16s ease}
+  .olsdp[data-open="true"] .olsdp-pop{opacity:1; transform:none; pointer-events:auto}
+  .olsdp-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+  .olsdp-title{font-family:"Fraunces",Georgia,serif; font-weight:600; font-size:17px; color:var(--dp-ink);
+    background:none; border:none; cursor:pointer; padding:6px 10px; border-radius:9px; transition:background .15s}
+  .olsdp-title:hover{background:var(--dp-accent-soft)}
+  .olsdp-ic{width:34px; height:34px; display:grid; place-items:center; border:none; background:none;
+    color:var(--dp-muted); cursor:pointer; border-radius:9px; transition:background .15s, color .15s}
+  .olsdp-ic:hover{background:var(--dp-accent-soft); color:var(--dp-accent-deep)}
+  .olsdp-ic:focus-visible,.olsdp-title:focus-visible{outline:none; box-shadow:0 0 0 3px var(--dp-accent-soft)}
+  .olsdp-dow{display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px}
+  .olsdp-dow span{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--dp-muted); text-align:center; padding:6px 0}
+  .olsdp-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px}
+  .olsdp-day{aspect-ratio:1; border:none; background:none; cursor:pointer; border-radius:10px; font:inherit;
+    font-size:14px; color:var(--dp-ink); font-variant-numeric:tabular-nums; position:relative;
+    transition:background .13s, color .13s, transform .05s}
+  .olsdp-day:hover:not(.is-disabled){background:var(--dp-accent-soft); color:var(--dp-accent-deep)}
+  .olsdp-day:active:not(.is-disabled){transform:scale(.9)}
+  .olsdp-day:focus-visible{outline:none; box-shadow:0 0 0 3px var(--dp-accent-soft)}
+  .olsdp-day.is-outside{color:var(--dp-muted); opacity:.5}
+  .olsdp-day.is-today{font-weight:600; color:var(--dp-today)}
+  .olsdp-day.is-today::after{content:""; position:absolute; bottom:5px; left:50%; width:4px; height:4px;
+    border-radius:50%; background:var(--dp-today); transform:translateX(-50%)}
+  .olsdp-day.is-selected{background:var(--dp-accent); color:#fff; font-weight:600}
+  .olsdp-day.is-selected::after{background:#fff}
+  .olsdp-day.is-selected:hover{background:var(--dp-accent-deep); color:#fff}
+  .olsdp-day.is-disabled{color:var(--dp-muted); opacity:.32; cursor:not-allowed}
+  .olsdp-months{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding-top:2px}
+  .olsdp-mo{padding:13px 0; border:1px solid var(--dp-line); background:none; border-radius:10px; font:inherit;
+    font-size:14px; color:var(--dp-ink); cursor:pointer; transition:.13s}
+  .olsdp-mo:hover:not([disabled]){border-color:var(--dp-accent); background:var(--dp-accent-soft); color:var(--dp-accent-deep)}
+  .olsdp-mo.is-current{background:var(--dp-accent); color:#fff; border-color:var(--dp-accent)}
+  .olsdp-mo[disabled]{opacity:.3; cursor:not-allowed}
+  .olsdp-mo:focus-visible{outline:none; box-shadow:0 0 0 3px var(--dp-accent-soft)}
+  .olsdp-foot{display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px;
+    border-top:1px solid var(--dp-line)}
+  .olsdp-today-btn{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--dp-accent-deep);
+    background:none; border:none; cursor:pointer; padding:6px 8px; border-radius:8px}
+  .olsdp-today-btn:hover{background:var(--dp-accent-soft)}
+  @media (hover:none){ .olsdp-day{font-size:15px} .olsdp-field{min-height:46px} }
+  @media (prefers-reduced-motion:reduce){ .olsdp-pop,.olsdp-day,.olsdp-field,.chev{transition:none!important} }
+
+  /* ---------- control row layout ---------- */
+  .ctl-row{display:flex; flex-wrap:wrap; gap:14px; align-items:end}
+  .ctl-date, .ctl-po{flex:0 0 220px; width:220px; max-width:220px; min-width:0}
+  .ctl-date .olsdp-field, .ctl-po .olspo-field{width:100%; min-width:0; height:46px}
+  .go.ctl-btn{flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+    height:46px; padding:0 26px; line-height:1; white-space:nowrap}
+  @media (max-width:640px){
+    .ctl-row{gap:12px}
+    .ctl-date, .ctl-po{flex:1 1 100%; width:100%; max-width:none}
+    .go.ctl-btn{flex:1 1 100%; width:100%; margin-top:2px}
+  }
+
+  /* ---------- premium purchase-order dropdown ---------- */
+  .olspo-field{display:flex; align-items:center; gap:10px; width:100%; font:inherit; font-size:15px;
+    color:var(--dp-ink); background:var(--dp-card); border:1px solid var(--dp-line); border-radius:11px;
+    padding:11px 14px; cursor:pointer; text-align:left; transition:border-color .18s, box-shadow .18s}
+  .olspo-field:hover{border-color:var(--dp-accent)}
+  .olspo-field:focus-visible{outline:none; border-color:var(--dp-accent); box-shadow:0 0 0 3px var(--dp-accent-soft)}
+  .olspo-field:disabled{opacity:.55; cursor:not-allowed}
+  .olspo-val{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+  .olspo-val.is-placeholder{color:var(--dp-muted)}
+  .olspo-chev{color:var(--dp-muted); display:flex; transition:transform .2s}
+  .olspo[data-open="true"] .olspo-chev{transform:rotate(180deg)}
+  .olspo-pop{position:absolute; z-index:60; top:calc(100% + 8px); left:0; width:100%; min-width:220px;
+    max-height:288px; overflow-y:auto; background:var(--dp-card); border:1px solid var(--dp-line);
+    border-radius:14px; box-shadow:var(--dp-shadow); padding:6px; transform-origin:top;
+    opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none;
+    transition:opacity .16s ease, transform .16s ease}
+  .olspo[data-open="true"] .olspo-pop{opacity:1; transform:none; pointer-events:auto}
+  .olspo-opt{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:9px;
+    cursor:pointer; font-size:14px; color:var(--dp-ink); transition:background .12s, color .12s}
+  .olspo-opt .olspo-optlabel{flex:1; min-width:0; word-break:break-word; font-variant-numeric:tabular-nums}
+  .olspo-opt.is-active{background:var(--dp-accent-soft); color:var(--dp-accent-deep)}
+  .olspo-opt.is-selected{color:var(--dp-accent-deep); font-weight:600}
+  .olspo-check{color:var(--dp-accent); display:flex; flex:0 0 auto}
+  .olspo-empty{padding:12px; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:12px;
+    color:var(--dp-muted)}
+  @media (hover:none){ .olspo-field{min-height:46px} .olspo-opt{padding:13px 12px} }
+
+  /* ---------- total quantity card ---------- */
+  .qty-card{margin:0 0 18px; padding:18px 20px; background:var(--paper);
+    border:1px solid var(--line); border-radius:14px; display:flex; flex-direction:column; gap:5px}
+  .qty-label{font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted)}
+  .qty-value{font-family:"Fraunces",Georgia,serif; font-weight:600; font-size:40px; line-height:1;
+    color:var(--accent-deep)}
+  .qty-value .qty-unit{font-size:18px; color:var(--muted)}
+  .qty-sub{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted)}
+  .qty-sub .qty-po{color:var(--accent-deep)}
+  @media (max-width:520px){ .qty-value{font-size:34px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Order &rarr; Labelled Images</div>
+    <h1>Order Label Studio</h1>
+    <p class="sub">Drop in your daily order spreadsheet. This tool downloads each product image
+      <b>in your exact row order</b> (duplicates kept), stamps it with
+      <b>&lt;size&gt; : &lt;qty&gt;</b>, and hands you a ZIP and/or PDF.
+      Everything runs on your computer &mdash; nothing is uploaded.</p>
+  </header>
+
+  <!-- STEP 1: file -->
+  <div class="card">
+    <div class="step"><span class="num">1</span><div><h2>Choose your Excel file</h2></div></div>
+    <p class="hint">The sheet needs columns named <code>IMAGE LINK</code>, <code>SKU CODE</code> and
+      <code>ORDERED QTY.</code> (spelling/caps don't have to be exact).</p>
+    <div class="drop" id="drop">
+      <div>Drag your <strong>.xlsx</strong> here, or click to browse</div>
+      <div class="file" id="fileName"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+    <div id="parseMsg" class="statline" style="margin-top:12px"></div>
+
+    <!-- ADDED: pull orders straight from Google (no manual download/upload) -->
+    <div style="margin-top:18px; padding-top:18px; border-top:1px solid var(--line)">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.06em;
+        text-transform:uppercase; color:var(--muted); margin-bottom:12px">
+        &mdash; or pull orders automatically &mdash;
+      </div>
+      <div class="ctl-row">
+        <div class="olsdp-wrap ctl-date">
+          <span class="olsdp-lbl">Order date</span>
+          <div id="exportDatePicker"></div>
+          <input type="hidden" id="exportDate">
+        </div>
+        <div class="olsdp-wrap ctl-po">
+          <span class="olsdp-lbl">Purchase order</span>
+          <div id="exportPoPicker"></div>
+          <input type="hidden" id="exportPo">
+        </div>
+        <button class="go ctl-btn" id="exportToday" style="background:var(--accent-deep)">Export Orders</button>
+      </div>
+      <div id="exportMsg" class="statline" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- STEP 2: options -->
+  <div class="card">
+    <div class="step"><span class="num">2</span><div><h2>Choose output</h2></div></div>
+    <div class="opts">
+      <div class="opt">
+        <label>Format</label>
+        <select id="fmt">
+          <option value="both">ZIP + PDF</option>
+          <option value="zip">ZIP only</option>
+          <option value="pdf">PDF only</option>
+        </select>
+      </div>
+      <div class="opt">
+        <label>Image size</label>
+        <select id="size">
+          <option value="1000">Standard (1000px)</option>
+          <option value="1400">Large (1400px)</option>
+          <option value="700">Small (700px)</option>
+        </select>
+      </div>
+      <button class="go" id="run" disabled>Process images</button>
+    </div>
+
+    <!-- customization panel -->
+    <div class="custom">
+      <div class="custom-col">
+        <h3>Label</h3>
+        <div class="opt">
+          <label>Position</label>
+          <select id="pos">
+            <option value="top">Top</option>
+            <option value="below-top">Below Top</option>
+            <option value="middle">Middle</option>
+            <option value="below-middle">Below Middle</option>
+            <option value="bottom" selected>Bottom</option>
+          </select>
+        </div>
+        <div class="opt">
+          <label>Style</label>
+          <select id="labelStyle">
+            <option value="banner">Full-width banner</option>
+            <option value="pill" selected>Pill (floating)</option>
+            <option value="box">Box (floating)</option>
+            <option value="text">Text only (no background)</option>
+          </select>
+        </div>
+        <div class="opt">
+          <label>Label color</label>
+          <input type="color" id="labelColor" value="#111111">
+        </div>
+        <div class="opt">
+          <label>Opacity <output id="opVal">85%</output></label>
+          <input type="range" id="labelOpacity" min="0" max="100" value="85">
+        </div>
+        <div class="opt">
+          <label>Rounded edges <output id="radVal">14px</output></label>
+          <input type="range" id="labelRadius" min="0" max="60" value="14">
+        </div>
+      </div>
+
+      <div class="custom-col">
+        <h3>Font</h3>
+        <div class="opt">
+          <label>Font color</label>
+          <input type="color" id="fontColor" value="#ffffff">
+        </div>
+        <div class="opt">
+          <label>Size <output id="fsVal">Auto</output></label>
+          <input type="range" id="fontSize" min="0" max="120" value="0">
+          <small class="micro">0 = auto-fit</small>
+        </div>
+        <div class="opt">
+          <label>Font family</label>
+          <select id="fontFamily">
+            <option value="'IBM Plex Mono', monospace">Plex Mono</option>
+            <option value="'IBM Plex Sans', sans-serif">Plex Sans</option>
+            <option value="Arial, Helvetica, sans-serif">Arial</option>
+            <option value="'Courier New', monospace">Courier</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', serif">Times</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="Impact, sans-serif">Impact</option>
+          </select>
+        </div>
+        <div class="opt">
+          <label>Weight</label>
+          <select id="fontWeight">
+            <option value="400">Regular</option>
+            <option value="500">Medium</option>
+            <option value="600" selected>Semibold</option>
+            <option value="700">Bold</option>
+            <option value="900">Heavy</option>
+          </select>
+        </div>
+        <div class="opt">
+          <label>Style</label>
+          <select id="fontStyle">
+            <option value="normal">Normal</option>
+            <option value="italic">Italic</option>
+            <option value="uppercase">UPPERCASE</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="custom-col preview-col">
+        <h3>Live preview</h3>
+        <canvas id="preview" width="240" height="240"></canvas>
+        <small class="micro">Sample label &mdash; updates as you adjust.</small>
+      </div>
+    </div>
+    <label class="relay"><input type="checkbox" id="relay" checked>
+      Use a fetch relay for blocked images <span>(recommended &mdash; only the image link is sent to a free relay; your spreadsheet data stays on your computer)</span></label>
+  </div>
+
+  <!-- STEP 3: progress + results -->
+  <div class="card hidden" id="resultCard">
+    <div class="step"><span class="num">3</span><div><h2>Results</h2></div></div>
+    <div id="qtyCard" class="qty-card hidden">
+      <div class="qty-label">Total order quantity</div>
+      <div class="qty-value"><span id="qtyValue">0</span> <span class="qty-unit">pcs</span></div>
+      <div class="qty-sub"><span id="qtyLines">0</span> order lines<span id="qtyPo"></span></div>
+    </div>
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="statline" id="progressLine">Starting&hellip;</div>
+    <div id="summary" class="statline hidden" style="margin-top:10px"></div>
+    <div class="dl hidden" id="dlRow"></div>
+    <div id="corsNote" class="note hidden" style="margin-top:16px"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <footer>Runs entirely in your browser &middot; no data leaves this page</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const drop=$("drop"), fileInput=$("fileInput"), fileName=$("fileName"),
+      parseMsg=$("parseMsg"), runBtn=$("run");
+let rows = [];   // [{idx, url, sku, qty, label}]
+
+/* ---------- column matching ---------- */
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g,"");
+const ALIASES = {
+  image_link:["imagelink","image","imageurl","imgurl","imglink","img","url","link"],
+  sku_code:["skucode","sku","skuid","code"],
+  ordered_qty:["orderedqty","qty","quantity","orderqty","orderedquantity"]
+};
+function resolveCols(headers){
+  const map={}; const nm={}; headers.forEach(h=>nm[norm(h)]=h);
+  for(const key in ALIASES){
+    let found=null;
+    for(const c of [key.replace("_",""),...ALIASES[key]]){ if(nm[c]){found=nm[c];break;} }
+    if(!found) throw new Error("Could not find a column for "+key.replace("_"," ").toUpperCase());
+    map[key]=found;
+  }
+  return map;
+}
+
+/* ---------- SKU rule: the size = text after the LAST underscore, else blank ---------- */
+function extractSku(v){
+  if(v===null||v===undefined) return "";
+  const s=String(v).trim();
+  return s.includes("_") ? s.slice(s.lastIndexOf("_")+1) : "";
+}
+function fmtQty(v){
+  if(v===null||v===undefined||v==="") return "";
+  const n=Number(v);
+  return (!isNaN(n)&&Number.isInteger(n)) ? String(n) : String(v).trim();
+}
+
+/* ---------- read excel ---------- */
+function handleFile(file){
+  if(!file) return;
+  fileName.textContent=file.name;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{defval:""});
+      if(!data.length) throw new Error("The first sheet looks empty.");
+      const cols=resolveCols(Object.keys(data[0]));
+      rows=data.map((r,i)=>{
+        const sku=extractSku(r[cols.sku_code]);
+        const qty=fmtQty(r[cols.ordered_qty]);
+        const label = sku ? `${sku} : ${qty} Pcs.` : `${qty} : Pcs.`;
+        return {idx:i+1, url:String(r[cols.image_link]||"").trim(),
+                sku, qty, label};
+      });
+      const blanks=rows.filter(r=>r.sku==="").length;
+      parseMsg.innerHTML=`<b>${rows.length}</b> rows loaded &middot; columns matched: `+
+        `<code>${cols.image_link}</code>, <code>${cols.sku_code}</code>, <code>${cols.ordered_qty}</code>`+
+        (blanks?` &middot; ${blanks} row(s) have no underscore &rarr; blank label`:"");
+      runBtn.disabled=false;
+    }catch(err){
+      parseMsg.innerHTML=`<span style="color:var(--accent-deep)"><b>Couldn't read that file:</b> ${err.message}</span>`;
+      runBtn.disabled=true;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=e=>handleFile(e.target.files[0]);
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hot");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hot");}));
+drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
+
+/* ---------- image loading (cross-origin aware, with relay fallback) ---------- */
+function tryLoad(src, timeout){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.crossOrigin="anonymous";
+    let done=false;
+    const finish=v=>{ if(!done){done=true; resolve(v);} };
+    img.onload=()=>finish(img.naturalWidth ? img : null);
+    img.onerror=()=>finish(null);
+    setTimeout(()=>finish(null), timeout||15000);
+    img.src=src;
+  });
+}
+async function loadImage(url, useRelay, maxDim){
+  if(!url || !/^https?:\/\//i.test(url)) return null;
+  // 1) straight at the host (fails fast if blocked)
+  let img=await tryLoad(url, 9000);
+  if(img) return img;
+  if(!useRelay) return null;
+  // 2) relays. weserv is image-optimised and resizes server-side (smaller = faster).
+  const noScheme=url.replace(/^https?:\/\//,"");
+  const relays=[
+    "https://images.weserv.nl/?url="+encodeURIComponent(noScheme)+"&w="+maxDim+"&output=jpg",
+    "https://corsproxy.io/?url="+encodeURIComponent(url),
+    "https://api.allorigins.win/raw?url="+encodeURIComponent(url)
+  ];
+  for(const r of relays){
+    img=await tryLoad(r, 13000);
+    if(img) return img;
+  }
+  return null;
+}
+
+/* ---------- annotate onto a canvas ---------- */
+function hexToRgba(hex, alpha){
+  const h=hex.replace("#",""); const n=parseInt(h.length===3?h.split("").map(c=>c+c).join(""):h,16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`;
+}
+function roundRect(ctx,x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function makeCanvas(img, label, maxDim, s){
+  const c=document.createElement("canvas");
+  const ctx=c.getContext("2d");
+  let iw,ih;
+  if(img){
+    const scale=Math.min(1, maxDim/Math.max(img.naturalWidth,img.naturalHeight));
+    iw=Math.round(img.naturalWidth*scale); ih=Math.round(img.naturalHeight*scale);
+  }else{ iw=maxDim; ih=maxDim; }
+
+  // a full-width banner adds height above/below; floating styles overlay the image
+  const isBanner = s.labelStyle==="banner";
+  const band=Math.max(46, Math.round(ih*0.12));
+  const bannerEdge = isBanner && (s.pos==="top"||s.pos==="bottom");
+  const extra = bannerEdge ? band : 0;
+
+  c.width=iw; c.height=ih+extra;
+  ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,c.width,c.height);
+  const imgY = (bannerEdge && s.pos==="top") ? band : 0;
+
+  // draw the image (or placeholder)
+  if(img){
+    ctx.drawImage(img,0,imgY,iw,ih);
+  }else{
+    ctx.fillStyle="#ebebeb"; ctx.fillRect(0,imgY,iw,ih);
+    ctx.fillStyle="#9a9a9a"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font=`600 ${Math.round(iw*0.045)}px 'IBM Plex Sans',sans-serif`;
+    ctx.fillText("IMAGE UNAVAILABLE", iw/2, imgY+ih/2);
+  }
+
+  // ---- label text setup ----
+  const text=(s.fontStyle==="uppercase" ? (label||"").toUpperCase() : (label||" "));
+  const italic = s.fontStyle==="italic" ? "italic " : "";
+  let fs = s.fontSize>0 ? s.fontSize : Math.round(band*0.5);
+  const setFont = px => ctx.font=`${italic}${s.fontWeight} ${px}px ${s.fontFamily}`;
+  setFont(fs);
+  // auto-fit only when size is 0 (auto)
+  if(s.fontSize===0){
+    while(fs>12 && ctx.measureText(text).width>iw-28){ fs-=2; setFont(fs); }
+  }
+  const textW=ctx.measureText(text).width;
+  const padX=Math.round(fs*0.7), padY=Math.round(fs*0.45);
+
+  // vertical centre of the label band, per position (within the image area)
+  const top=imgY, bot=imgY+ih;
+  let cy;
+  switch(s.pos){
+    case "top":          cy = bannerEdge ? band/2 : top + band*0.6; break;
+    case "below-top":    cy = top + ih*0.25; break;
+    case "middle":       cy = top + ih*0.5; break;
+    case "below-middle": cy = top + ih*0.75; break;
+    default:             cy = bannerEdge ? bot + band/2 : bot - band*0.6; // bottom
+  }
+
+  const alpha=s.labelOpacity/100;
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+
+  if(s.labelStyle==="banner"){
+    const by = bannerEdge ? (s.pos==="top"?0:bot) : cy-band/2;
+    ctx.fillStyle=hexToRgba(s.labelColor, bannerEdge?1:alpha);
+    ctx.fillRect(0, by, iw, band);
+    ctx.fillStyle=s.fontColor;
+    ctx.fillText(text, iw/2, by+band/2);
+  } else if(s.labelStyle==="text"){
+    // subtle shadow so text stays readable on any image
+    ctx.fillStyle=hexToRgba("#000000", 0.45*alpha);
+    ctx.fillText(text, iw/2+2, cy+2);
+    ctx.fillStyle=s.fontColor;
+    ctx.fillText(text, iw/2, cy);
+  } else {
+    // pill / box: floating rounded rectangle
+    const boxW=textW+padX*2, boxH=fs+padY*2;
+    const bx=(iw-boxW)/2, by=cy-boxH/2;
+    const r = s.labelStyle==="pill" ? boxH/2 : Math.min(s.labelRadius, boxH/2);
+    ctx.fillStyle=hexToRgba(s.labelColor, alpha);
+    roundRect(ctx,bx,by,boxW,boxH,r); ctx.fill();
+    ctx.fillStyle=s.fontColor;
+    ctx.fillText(text, iw/2, cy);
+  }
+  return c;
+}
+const canvasToBlob = c => new Promise(res=>c.toBlob(res,"image/jpeg",0.9));
+
+/* gather current style settings from the controls */
+function readStyle(){
+  return {
+    pos:        $("pos").value,
+    labelStyle: $("labelStyle").value,
+    labelColor: $("labelColor").value,
+    labelOpacity:+$("labelOpacity").value,
+    labelRadius:+$("labelRadius").value,
+    fontColor:  $("fontColor").value,
+    fontSize:   +$("fontSize").value,
+    fontFamily: $("fontFamily").value,
+    fontWeight: $("fontWeight").value,
+    fontStyle:  $("fontStyle").value
+  };
+}
+
+/* ---------- main run ---------- */
+runBtn.onclick=async ()=>{
+  runBtn.disabled=true;
+  const fmt=$("fmt").value, maxDim=parseInt($("size").value,10);
+  const useRelay=$("relay").checked;
+  const style=readStyle();
+  $("resultCard").classList.remove("hidden");
+  $("resultCard").scrollIntoView({behavior:"smooth"});
+  const grid=$("grid"); grid.innerHTML="";
+  $("summary").classList.add("hidden"); $("dlRow").classList.add("hidden");
+  $("corsNote").classList.add("hidden");
+
+  const pad=String(rows.length).length;
+  const urlCache=new Map();         // url -> Promise<img>, so duplicates fetch once
+  const outputs=new Array(rows.length);
+  let loaded=0, placeholders=0, done=0;
+
+  // pre-build cells in row order so the grid never looks shuffled
+  const cells=rows.map(r=>{
+    const c=document.createElement("div"); c.className="cell";
+    c.innerHTML=`<div style="height:108px;display:grid;place-items:center;background:#f0ebe0;color:#b3a98f;font-size:11px">…</div>`+
+      `<div class="cap">#${r.idx}<br><b>${r.label}</b></div>`;
+    grid.appendChild(c); return c;
+  });
+
+  function getImg(url){
+    if(!urlCache.has(url)) urlCache.set(url, loadImage(url, useRelay, maxDim));
+    return urlCache.get(url);
+  }
+
+  async function handle(i){
+    const r=rows[i];
+    const img=await getImg(r.url);
+    if(img) loaded++; else placeholders++;
+    const canvas=makeCanvas(img,r.label,maxDim,style);
+    const blob=await canvasToBlob(canvas);
+    const safe=(r.sku||"no_sku").replace(/[^A-Za-z0-9_.-]/g,"_");
+    const dataURL=canvas.toDataURL("image/jpeg",0.7);
+    outputs[i]={name:`${String(r.idx).padStart(pad,"0")}_${safe}.jpg`, blob, dataURL};
+    // fill this row's cell in place
+    cells[i].innerHTML=`<img src="${dataURL}" alt="">`+
+      `<div class="cap">#${r.idx} <span class="pill ${img?'ok':'ph'}">${img?'image':'placeholder'}</span>`+
+      `<br><b>${r.label}</b></div>`;
+    done++;
+    $("barFill").style.width=Math.round((done/rows.length)*100)+"%";
+    $("progressLine").innerHTML=`Processed <b>${done}</b> of <b>${rows.length}</b> &middot; `+
+      `${loaded} loaded &middot; ${placeholders} placeholder`;
+  }
+
+  // worker pool: up to CONC rows in flight at once
+  const CONC=10; let next=0;
+  async function worker(){ while(next<rows.length){ const i=next++; await handle(i); } }
+  await Promise.all(Array.from({length:Math.min(CONC,rows.length)}, worker));
+
+  $("progressLine").innerHTML=`Done &middot; <b>${rows.length}</b> images generated, in row order.`;
+  $("summary").classList.remove("hidden");
+  $("summary").innerHTML=`<b>${loaded}</b> real images &middot; <b>${placeholders}</b> placeholders.`;
+
+  if(placeholders>0){
+    $("corsNote").classList.remove("hidden");
+    $("corsNote").innerHTML=`<b>Heads-up:</b> ${placeholders} image(s) couldn't be loaded, even through the relay. `+
+      `Your labels and row order are still 100% correct &mdash; those rows just got placeholders. `+
+      `If it's only a few, the relay may have been rate-limited; press <b>Process images</b> again to retry just-failed ones. `+
+      `If it's most of them, the desktop (Python) tool fetches images server-side and isn't affected by browser limits.`;
+  }
+
+  // build downloads
+  const base=(fileName.textContent||"orders").replace(/\.[^.]+$/,"");
+  const dlRow=$("dlRow"); dlRow.innerHTML=""; dlRow.classList.remove("hidden");
+
+  if(fmt==="zip"||fmt==="both"){
+    const zip=new JSZip();
+    outputs.forEach(o=>zip.file(o.name,o.blob));
+    const content=await zip.generateAsync({type:"blob"});
+    addDownload(dlRow,"Download ZIP",content,`${base}_labelled.zip`);
+  }
+  if(fmt==="pdf"||fmt==="both"){
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:"pt",format:"a4"});
+    const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight(), m=28;
+    for(let i=0;i<outputs.length;i++){
+      if(i>0) pdf.addPage();
+      const im=new Image(); im.src=outputs[i].dataURL;
+      await new Promise(r=>{im.onload=r;});
+      const maxW=pw-2*m, maxH=ph-2*m;
+      const sc=Math.min(maxW/im.naturalWidth, maxH/im.naturalHeight);
+      const w=im.naturalWidth*sc, h=im.naturalHeight*sc;
+      pdf.addImage(outputs[i].dataURL,"JPEG",(pw-w)/2,(ph-h)/2,w,h);
+    }
+    addDownload(dlRow,"Download PDF",pdf.output("blob"),`${base}_labelled.pdf`);
+  }
+  runBtn.disabled=false;
+};
+
+function addDownload(container,label,blob,filename){
+  const btn=document.createElement("button");
+  btn.className="dl-btn"; btn.textContent=label;
+  btn.onclick=()=>{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  };
+  container.appendChild(btn);
+}
+
+/* ---------- live preview + slider readouts ---------- */
+function makeSwatch(){
+  // a small dummy product image so the preview shows label-over-image
+  const c=document.createElement("canvas"); c.width=c.height=240;
+  const x=c.getContext("2d");
+  const g=x.createLinearGradient(0,0,240,240);
+  g.addColorStop(0,"#d9c7a3"); g.addColorStop(1,"#b98c63");
+  x.fillStyle=g; x.fillRect(0,0,240,240);
+  x.fillStyle="rgba(255,255,255,.25)";
+  for(let i=0;i<240;i+=30){ x.fillRect(i,0,2,240); }
+  const im=new Image();
+  return new Promise(res=>{ im.onload=()=>res(im); im.src=c.toDataURL(); });
+}
+let swatch=null;
+async function renderPreview(){
+  if(!swatch) swatch=await makeSwatch();
+  const style=readStyle();
+  const canvas=makeCanvas(swatch, "XXL : 1 Pcs.", 240, style);
+  const pv=$("preview"); const ctx=pv.getContext("2d");
+  pv.width=canvas.width; pv.height=canvas.height;
+  ctx.clearRect(0,0,pv.width,pv.height);
+  ctx.drawImage(canvas,0,0);
+}
+function syncOutputs(){
+  $("opVal").textContent=$("labelOpacity").value+"%";
+  $("radVal").textContent=$("labelRadius").value+"px";
+  $("fsVal").textContent=(+$("fontSize").value===0)?"Auto":$("fontSize").value+"px";
+}
+["pos","labelStyle","labelColor","labelOpacity","labelRadius",
+ "fontColor","fontSize","fontFamily","fontWeight","fontStyle"].forEach(id=>{
+  const el=$(id);
+  el.addEventListener("input",()=>{ syncOutputs(); renderPreview(); });
+});
+// fonts may load slightly after the page; redraw when ready
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(renderPreview);
+syncOutputs();
+renderPreview();
+</script>
+
+<!-- ============================================================= -->
+<!-- ADDED: Export Today's Orders  (remote trigger + auto-load)    -->
+<!-- Uses JSONP (a <script> tag) instead of fetch, because Apps    -->
+<!-- Script web apps don't return CORS headers for fetch(). This   -->
+<!-- block only ADDS behaviour; it reuses the existing handleFile()-->
+<!-- parser and the existing "Process images" button.             -->
+<!-- ============================================================= -->
+<script>
+(function(){
+  /* ---- CONFIG (already filled in) ---- */
+  const WEBAPP_URL   = "https://script.google.com/macros/s/AKfycby7mFqNXeKaO4d-STuPgBCbg2Oo9xx0NYTaEztQ5M_oXoUYqXJ4BHroY2bb-8reMDeaog/exec";
+  const WEBAPP_TOKEN = "000686d9-b9ee-43fd-ba52-d2b9f7a12bb5fc9b6f5331354ef8a7e8d7829b113539";
+  /* ------------------------------------ */
+
+  const exportBtn = document.getElementById("exportToday");
+  const exportMsg = document.getElementById("exportMsg");
+  const dateInput = document.getElementById("exportDate");
+  const poInput   = document.getElementById("exportPo");
+  const setMsg = html => { exportMsg.innerHTML = html; };
+
+  function po(){ return poInput ? (poInput.value || "") : ""; }
+  function setBusy(on){
+    exportBtn.disabled = on;
+    if(window.OLS_PO && window.OLS_PO.setDisabled) window.OLS_PO.setDisabled(on);
+  }
+  function todayStr(){
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+  function curDate(){ return (dateInput && dateInput.value) ? dateInput.value : todayStr(); }
+  if (dateInput && !dateInput.value) dateInput.value = todayStr();
+
+  function hideQty(){ const c = document.getElementById("qtyCard"); if(c) c.classList.add("hidden"); }
+  function showQty(total, lines, poLabel){
+    const card = document.getElementById("qtyCard"); if(!card) return;
+    document.getElementById("qtyValue").textContent = total;
+    document.getElementById("qtyLines").textContent = lines;
+    document.getElementById("qtyPo").innerHTML =
+      '  &middot;  <span class="qty-po">' + (poLabel ? poLabel : "all purchase orders") + "</span>";
+    card.classList.remove("hidden");
+  }
+  function sumQty(rows){
+    if(!rows || rows.length < 2) return 0;
+    const head = rows[0].map(function(h){ return String(h == null ? "" : h).toLowerCase().trim(); });
+    let qi = head.indexOf("ordered qty");
+    if(qi === -1) qi = head.findIndex(function(h){ return h.indexOf("order") > -1 && h.indexOf("qty") > -1; });
+    if(qi === -1) qi = 7;
+    let t = 0;
+    for(let i = 1; i < rows.length; i++){ const v = Number(rows[i][qi]); if(!isNaN(v)) t += v; }
+    return t;
+  }
+
+  // Shared JSONP caller (script tag, so no CORS issues).
+  function jsonp(params, onOk, onErr){
+    if(!WEBAPP_URL.includes("/exec")){ if(onErr) onErr("config"); return; }
+    const cbName = "olsCb_" + Date.now() + "_" + Math.floor(Math.random() * 1e4);
+    const script = document.createElement("script");
+    const timer = setTimeout(function(){ cleanup(); if(onErr) onErr("timeout"); }, 30000);
+    function cleanup(){
+      clearTimeout(timer);
+      try { delete window[cbName]; } catch(e){ window[cbName] = undefined; }
+      if(script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(payload){ cleanup(); onOk(payload); };
+    script.onerror = function(){ cleanup(); if(onErr) onErr("network"); };
+    let src = WEBAPP_URL + "?token=" + encodeURIComponent(WEBAPP_TOKEN);
+    Object.keys(params).forEach(function(k){ src += "&" + k + "=" + encodeURIComponent(params[k]); });
+    src += "&callback=" + cbName + "&t=" + Date.now();
+    script.src = src;
+    document.body.appendChild(script);
+  }
+
+  // Step 2: when a date is chosen, load that date's purchase orders (no images yet).
+  function loadPoList(){
+    const date = curDate();
+    if(window.OLS_PO) window.OLS_PO.setOptions([], "");
+    hideQty();
+    setMsg("Loading purchase orders for <b>" + date + "</b>&hellip;");
+    jsonp({ date: date, po: "" }, function(payload){
+      if(!payload || payload.status !== "ok"){ setMsg(""); return; }
+      const list = payload.poList || [];
+      if(window.OLS_PO) window.OLS_PO.setOptions(list, "");
+      const n = payload.rows ? payload.rows.length - 1 : 0;
+      if(n <= 0){ setMsg("No orders found for " + date + "."); return; }
+      setMsg(list.length
+        ? ("Found <b>" + n + "</b> order(s) &middot; <b>" + list.length + "</b> purchase order(s). Pick one, or press Export Orders for all.")
+        : ("Found <b>" + n + "</b> order(s) for this date. Press Export Orders."));
+    }, function(){ setMsg(""); });
+  }
+
+  // Step 4-6: export the selected date (+ optional PO) and generate images.
+  function run(){
+    if(!WEBAPP_URL.includes("/exec")){
+      setMsg('<span style="color:var(--accent-deep)"><b>Not set up yet:</b> paste your Web App URL into index.html first.</span>');
+      return;
+    }
+    const date = curDate();
+    const p = po();
+    setBusy(true);
+    setMsg("Contacting Google&hellip; exporting <b>" + date + "</b>" + (p ? " &middot; <b>" + p + "</b>" : "") + ".");
+    jsonp({ date: date, po: p }, onPayload, function(kind){
+      setMsg(kind === "network"
+        ? '<span style="color:var(--accent-deep)"><b>Could not reach the script.</b> Check the Web App URL and your connection.</span>'
+        : '<span style="color:var(--accent-deep)"><b>Timed out.</b> No response. Check the Web App URL and that it is deployed for &ldquo;Anyone&rdquo;.</span>');
+      setBusy(false);
+    });
+  }
+
+  function onPayload(payload){
+    try{
+      if(!payload || payload.status !== "ok"){
+        throw new Error((payload && payload.message) || "Script returned an error.");
+      }
+
+      // Keep the PO dropdown current with this date's list.
+      if(window.OLS_PO) window.OLS_PO.setOptions(payload.poList || [], po());
+
+      if(!payload.rows || payload.rows.length <= 1){
+        setMsg("No orders found for this selection.");
+        hideQty();
+        setBusy(false);
+        return;
+      }
+
+      const n = payload.rows.length - 1;
+      const total = (typeof payload.totalQty === "number") ? payload.totalQty : sumQty(payload.rows);
+      setMsg("Loaded <b>" + n + "</b> order(s), <b>" + total + "</b> pcs. Building the sheet&hellip;");
+      showQty(total, n, po());
+
+      const ws = XLSX.utils.aoa_to_sheet(payload.rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      const outArr = XLSX.write(wb, { type:"array", bookType:"xlsx" });
+      const file = new File([outArr], (payload.fileName || "Orders") + ".xlsx",
+        { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+      handleFile(file);
+
+      setMsg("Processing images&hellip;");
+      const started = Date.now();
+      const poll = setInterval(function(){
+        if(!runBtn.disabled){
+          clearInterval(poll);
+          runBtn.click();
+          setMsg("Done &mdash; images are generating below.");
+          setBusy(false);
+        }else if(Date.now() - started > 15000){
+          clearInterval(poll);
+          setMsg("File loaded, but parsing took too long. Scroll down and press <b>Process images</b>.");
+          setBusy(false);
+        }
+      }, 150);
+
+    }catch(err){
+      setMsg('<span style="color:var(--accent-deep)"><b>Could not export:</b> ' + err.message + '</span>');
+      setBusy(false);
+    }
+  }
+
+  exportBtn.addEventListener("click", run);
+  if(dateInput) dateInput.addEventListener("change", loadPoList);
+  // Load PO numbers for the default date once the pickers have initialised.
+  window.addEventListener("load", function(){ loadPoList(); });
+})();
+</script>
+
+<!-- ADDED: custom date picker (replaces the native date field) -->
+<script>
+/* Order Label Studio — custom date picker.
+   olsInitDatePicker(mountEl, hiddenInput, {max})
+   - Writes YYYY-MM-DD into hiddenInput.value and fires 'change'.
+   - Keyboard, ARIA, month/year switch, today highlight, disabled future dates. */
+function olsInitDatePicker(mount, hidden, opts){
+  opts = opts || {};
+  var MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+  var MO_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var DOW = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+  function ymd(d){
+    var m = String(d.getMonth()+1).padStart(2,"0");
+    var day = String(d.getDate()).padStart(2,"0");
+    return d.getFullYear()+"-"+m+"-"+day;
+  }
+  function parse(s){
+    if(!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    var p = s.split("-"); return new Date(+p[0], +p[1]-1, +p[2]);
+  }
+  function sameDay(a,b){ return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+  function startOfDay(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+
+  var today = startOfDay(new Date());
+  var max = opts.max ? startOfDay(opts.max) : today;      // no future dates
+  var selected = parse(hidden.value) || today;
+  if(selected > max) selected = max;
+  var focus = new Date(selected);
+  var viewY = selected.getFullYear(), viewM = selected.getMonth();
+  var mode = "days";
+
+  mount.className = "olsdp";
+  mount.innerHTML =
+    '<button type="button" class="olsdp-field" aria-haspopup="dialog" aria-expanded="false">'
+    + '<span class="cal" aria-hidden="true">'+calSvg()+'</span>'
+    + '<span class="val"></span>'
+    + '<span class="chev" aria-hidden="true">'+chevSvg()+'</span>'
+    + '</button>'
+    + '<div class="olsdp-pop" role="dialog" aria-label="Choose date"></div>';
+
+  var field = mount.querySelector(".olsdp-field");
+  var valEl = mount.querySelector(".val");
+  var pop   = mount.querySelector(".olsdp-pop");
+
+  function fmtLong(d){ return MONTHS[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear(); }
+  function syncField(){
+    valEl.textContent = selected ? fmtLong(selected) : "Select a date";
+    field.setAttribute("aria-label","Choose date, selected "+(selected?fmtLong(selected):"none"));
+  }
+
+  function open(){
+    mount.setAttribute("data-open","true");
+    field.setAttribute("aria-expanded","true");
+    render();
+    document.addEventListener("mousedown", onDocDown, true);
+    document.addEventListener("keydown", onDocKey, true);
+    requestAnimationFrame(function(){ focusActiveDay(); });
+  }
+  function close(returnFocus){
+    mount.removeAttribute("data-open");
+    field.setAttribute("aria-expanded","false");
+    document.removeEventListener("mousedown", onDocDown, true);
+    document.removeEventListener("keydown", onDocKey, true);
+    mode = "days";
+    if(returnFocus) field.focus();
+  }
+  function isOpen(){ return mount.getAttribute("data-open")==="true"; }
+  function onDocDown(e){ if(!mount.contains(e.target)) close(false); }
+  function onDocKey(e){ if(e.key==="Escape"){ e.preventDefault(); close(true); } }
+
+  function render(){ mode==="days" ? renderDays() : renderMonths(); }
+
+  function renderDays(){
+    var first = new Date(viewY, viewM, 1);
+    var startDow = first.getDay();
+    var gridStart = new Date(viewY, viewM, 1 - startDow);
+    var html =
+      '<div class="olsdp-head">'
+      + '<button type="button" class="olsdp-ic" data-nav="prev" aria-label="Previous month">'+arrow("l")+'</button>'
+      + '<button type="button" class="olsdp-title" aria-label="Switch month and year">'+MONTHS[viewM]+' '+viewY+'</button>'
+      + '<button type="button" class="olsdp-ic" data-nav="next" aria-label="Next month">'+arrow("r")+'</button>'
+      + '</div>'
+      + '<div class="olsdp-dow" aria-hidden="true">'+DOW.map(function(d){return '<span>'+d+'</span>';}).join("")+'</div>'
+      + '<div class="olsdp-grid" role="grid">';
+    for(var i=0;i<42;i++){
+      var d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate()+i);
+      var outside = d.getMonth()!==viewM;
+      var disabled = d > max;
+      var cls = "olsdp-day";
+      if(outside) cls+=" is-outside";
+      if(sameDay(d,today)) cls+=" is-today";
+      if(sameDay(d,selected)) cls+=" is-selected";
+      if(disabled) cls+=" is-disabled";
+      var tab = sameDay(d,focus) ? "0" : "-1";
+      html += '<button type="button" class="'+cls+'" role="gridcell" '
+        + 'data-date="'+ymd(d)+'" tabindex="'+tab+'" '
+        + (disabled?'aria-disabled="true" ':'')
+        + (sameDay(d,selected)?'aria-selected="true" ':'')
+        + 'aria-label="'+fmtLong(d)+'">'+d.getDate()+'</button>';
+    }
+    html += '</div>'
+      + '<div class="olsdp-foot">'
+      + '<button type="button" class="olsdp-today-btn" data-today>Jump to today</button>'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--dp-muted)">'+(selected?ymd(selected):"")+'</span>'
+      + '</div>';
+    pop.innerHTML = html;
+  }
+
+  function renderMonths(){
+    var html =
+      '<div class="olsdp-head">'
+      + '<button type="button" class="olsdp-ic" data-nav="yprev" aria-label="Previous year">'+arrow("l")+'</button>'
+      + '<button type="button" class="olsdp-title" data-back aria-label="Back to days">'+viewY+'</button>'
+      + '<button type="button" class="olsdp-ic" data-nav="ynext" aria-label="Next year">'+arrow("r")+'</button>'
+      + '</div><div class="olsdp-months" role="grid">';
+    for(var m=0;m<12;m++){
+      var disabled = new Date(viewY, m, 1) > new Date(max.getFullYear(), max.getMonth(), 1);
+      var cur = (m===viewM);
+      html += '<button type="button" class="olsdp-mo'+(cur?" is-current":"")+'" '
+        + 'data-month="'+m+'" '+(disabled?'aria-disabled="true" disabled ':'')
+        + 'aria-label="'+MONTHS[m]+' '+viewY+'">'+MO_SHORT[m]+'</button>';
+    }
+    html += '</div>';
+    pop.innerHTML = html;
+    var t = pop.querySelector(".olsdp-title"); if(t) t.focus();
+  }
+
+  function focusActiveDay(){
+    var el = pop.querySelector('.olsdp-day[tabindex="0"]') || pop.querySelector(".olsdp-day");
+    if(el) el.focus();
+  }
+
+  function goMonth(delta){
+    viewM += delta;
+    if(viewM<0){ viewM=11; viewY--; }
+    if(viewM>11){ viewM=0; viewY++; }
+  }
+  function moveFocus(days){
+    var nf = new Date(focus.getFullYear(), focus.getMonth(), focus.getDate()+days);
+    if(nf>max) nf = new Date(max);
+    focus = nf; viewY = focus.getFullYear(); viewM = focus.getMonth();
+    renderDays(); focusActiveDay();
+  }
+  function pick(d){
+    if(d>max) return;
+    selected = startOfDay(d); focus = new Date(selected);
+    hidden.value = ymd(selected);
+    hidden.dispatchEvent(new Event("change", {bubbles:true}));
+    syncField(); close(true);
+  }
+
+  field.addEventListener("click", function(){ isOpen() ? close(false) : open(); });
+  field.addEventListener("keydown", function(e){
+    if(e.key==="ArrowDown"||e.key==="Enter"||e.key===" "){ e.preventDefault(); if(!isOpen()) open(); }
+  });
+
+  pop.addEventListener("click", function(e){
+    var t = e.target.closest("button"); if(!t) return;
+    if(t.dataset.date!==undefined && !t.classList.contains("is-disabled")){ pick(parse(t.dataset.date)); return; }
+    if(t.classList.contains("olsdp-title") && !t.hasAttribute("data-back")){ mode="months"; renderMonths(); return; }
+    if(t.hasAttribute("data-back")){ mode="days"; renderDays(); focusActiveDay(); return; }
+    if(t.dataset.month!==undefined){ viewM=+t.dataset.month; mode="days"; renderDays(); focusActiveDay(); return; }
+    if(t.hasAttribute("data-today")){ focus=new Date(today); selected=new Date(today); viewY=today.getFullYear(); viewM=today.getMonth(); pick(today); return; }
+    var nav = t.dataset.nav;
+    if(nav==="prev"){ goMonth(-1); renderDays(); }
+    else if(nav==="next"){ goMonth(1); renderDays(); }
+    else if(nav==="yprev"){ viewY--; renderMonths(); }
+    else if(nav==="ynext"){ viewY++; renderMonths(); }
+  });
+
+  pop.addEventListener("keydown", function(e){
+    if(mode!=="days") return;
+    var k = e.key;
+    if(k==="ArrowLeft"){ e.preventDefault(); moveFocus(-1); }
+    else if(k==="ArrowRight"){ e.preventDefault(); moveFocus(1); }
+    else if(k==="ArrowUp"){ e.preventDefault(); moveFocus(-7); }
+    else if(k==="ArrowDown"){ e.preventDefault(); moveFocus(7); }
+    else if(k==="Home"){ e.preventDefault(); moveFocus(-focus.getDay()); }
+    else if(k==="End"){ e.preventDefault(); moveFocus(6-focus.getDay()); }
+    else if(k==="PageUp"){ e.preventDefault(); goMonth(-1); focus=new Date(viewY,viewM,Math.min(focus.getDate(),28)); renderDays(); focusActiveDay(); }
+    else if(k==="PageDown"){ e.preventDefault(); goMonth(1); focus=new Date(viewY,viewM,Math.min(focus.getDate(),28)); renderDays(); focusActiveDay(); }
+    else if(k==="Enter"||k===" "){ e.preventDefault(); if(focus<=max) pick(focus); }
+  });
+
+  function calSvg(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>'; }
+  function chevSvg(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>'; }
+  function arrow(dir){ var p = dir==="l" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"; return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="'+p+'"/></svg>'; }
+
+  if(!hidden.value) hidden.value = ymd(selected);
+  syncField();
+}
+
+/* Order Label Studio - custom premium <select> replacement.
+   olsInitSelect(mount, hidden, {placeholder, onChange})
+   API: setOptions(list, keep), getValue(), setValue(v), setDisabled(b) */
+function olsInitSelect(mount, hidden, opts){
+  opts = opts || {};
+  var placeholder = opts.placeholder || "All";
+  var options = [{ value:"", label:placeholder }];
+  var active = 0;
+
+  mount.className = "olspo";
+  mount.innerHTML =
+    '<button type="button" class="olspo-field" aria-haspopup="listbox" aria-expanded="false">'
+    + '<span class="olspo-val"></span><span class="olspo-chev" aria-hidden="true">'+chev()+'</span></button>'
+    + '<div class="olspo-pop" role="listbox"></div>';
+
+  var field = mount.querySelector(".olspo-field");
+  var valEl = mount.querySelector(".olspo-val");
+  var pop   = mount.querySelector(".olspo-pop");
+
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function labelFor(v){ var o = options.find(function(x){ return x.value===v; }); return o ? o.label : placeholder; }
+  function syncField(){
+    var v = hidden.value || "";
+    valEl.textContent = labelFor(v);
+    valEl.classList.toggle("is-placeholder", !v);
+    field.setAttribute("aria-label", "Purchase order, " + labelFor(v));
+  }
+  function renderOpts(){
+    var v = hidden.value || "";
+    var html = options.map(function(o,i){
+      var sel = (o.value===v);
+      return '<div class="olspo-opt'+(sel?" is-selected":"")+(i===active?" is-active":"")+'" '
+        + 'role="option" id="olspo-opt-'+i+'" data-i="'+i+'" aria-selected="'+sel+'">'
+        + '<span class="olspo-optlabel">'+esc(o.label)+'</span>'
+        + (sel?'<span class="olspo-check" aria-hidden="true">'+check()+'</span>':'')
+        + '</div>';
+    }).join("");
+    if(options.length===1) html += '<div class="olspo-empty">No separate POs for this date</div>';
+    pop.innerHTML = html;
+    field.setAttribute("aria-activedescendant", "olspo-opt-"+active);
+    var act = pop.querySelector(".olspo-opt.is-active");
+    if(act) act.scrollIntoView({ block:"nearest" });
+  }
+  function isOpen(){ return mount.getAttribute("data-open")==="true"; }
+  function open(){
+    if(opts.disabled) return;
+    mount.setAttribute("data-open","true");
+    field.setAttribute("aria-expanded","true");
+    var v = hidden.value || "";
+    active = Math.max(0, options.findIndex(function(o){ return o.value===v; }));
+    renderOpts();
+    document.addEventListener("mousedown", onDocDown, true);
+  }
+  function close(rf){
+    mount.removeAttribute("data-open");
+    field.setAttribute("aria-expanded","false");
+    document.removeEventListener("mousedown", onDocDown, true);
+    if(rf) field.focus();
+  }
+  function onDocDown(e){ if(!mount.contains(e.target)) close(false); }
+
+  function commit(i){
+    var o = options[i]; if(!o) return;
+    hidden.value = o.value;
+    hidden.dispatchEvent(new Event("change", { bubbles:true }));
+    syncField();
+    if(opts.onChange) opts.onChange(o.value);
+    close(true);
+  }
+  function moveActive(delta){
+    active = Math.min(options.length-1, Math.max(0, active+delta));
+    renderOpts();
+  }
+
+  field.addEventListener("click", function(){ isOpen() ? close(false) : open(); });
+  field.addEventListener("keydown", function(e){
+    if(!isOpen()){
+      if(e.key==="ArrowDown"||e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }
+      return;
+    }
+    if(e.key==="ArrowDown"){ e.preventDefault(); moveActive(1); }
+    else if(e.key==="ArrowUp"){ e.preventDefault(); moveActive(-1); }
+    else if(e.key==="Home"){ e.preventDefault(); active=0; renderOpts(); }
+    else if(e.key==="End"){ e.preventDefault(); active=options.length-1; renderOpts(); }
+    else if(e.key==="Enter"||e.key===" "){ e.preventDefault(); commit(active); }
+    else if(e.key==="Escape"){ e.preventDefault(); close(true); }
+    else if(e.key==="Tab"){ close(false); }
+    else if(e.key.length===1){
+      var ch = e.key.toLowerCase();
+      var idx = options.findIndex(function(o,i){ return i>active && o.label.toLowerCase().indexOf(ch)===0; });
+      if(idx===-1) idx = options.findIndex(function(o){ return o.label.toLowerCase().indexOf(ch)===0; });
+      if(idx>-1){ active=idx; renderOpts(); }
+    }
+  });
+  pop.addEventListener("click", function(e){
+    var el = e.target.closest(".olspo-opt"); if(!el) return;
+    commit(+el.dataset.i);
+  });
+  pop.addEventListener("mousemove", function(e){
+    var el = e.target.closest(".olspo-opt"); if(!el) return;
+    var i = +el.dataset.i; if(i!==active){ active=i; renderOpts(); }
+  });
+
+  function chev(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>'; }
+  function check(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>'; }
+
+  syncField();
+
+  return {
+    setOptions: function(list, keep){
+      var prev = (keep!=null) ? keep : (hidden.value||"");
+      options = [{ value:"", label:placeholder }].concat(
+        (list||[]).map(function(p){ return { value:p, label:p }; })
+      );
+      if(prev && !options.some(function(o){ return o.value===prev; })) prev = "";
+      hidden.value = prev;
+      syncField();
+      if(isOpen()) renderOpts();
+    },
+    getValue: function(){ return hidden.value||""; },
+    setValue: function(v){ if(options.some(function(o){ return o.value===v; })){ hidden.value=v; syncField(); } },
+    setDisabled: function(b){ opts.disabled=!!b; field.disabled=!!b; if(b) close(false); }
+  };
+}
+
+(function(){
+  var dMount = document.getElementById("exportDatePicker");
+  var dHidden = document.getElementById("exportDate");
+  if(dMount && dHidden) olsInitDatePicker(dMount, dHidden);
+
+  var pMount = document.getElementById("exportPoPicker");
+  var pHidden = document.getElementById("exportPo");
+  if(pMount && pHidden) window.OLS_PO = olsInitSelect(pMount, pHidden, { placeholder: "All purchase orders" });
+})();
+</script>
+</body>
+</html>
